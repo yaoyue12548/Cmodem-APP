@@ -9,7 +9,7 @@ class CoreJsInterface(private val host: MainActivity) {
 
     @JavascriptInterface
     fun assetRead(name: String): String {
-        require(name in setOf("fhcpeweb.html", "device_address.js", "lan_ui.js", "air6_ui.js", "air6_automation.js", "sms_cards.js", "android_ui.css", "upstream_images.js", "changelog.json"))
+        require(name in setOf("fhcpeweb.html", "device_address.js", "lan_ui.js", "air6_ui.js", "air6_automation.js", "sms_cards.js", "android_ui.css", "upstream_images.js", "lg6851f_image.js", "changelog.json"))
         return host.assets.open(name).bufferedReader(Charsets.UTF_8).use { it.readText() }
     }
 

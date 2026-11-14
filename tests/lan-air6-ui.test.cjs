@@ -153,6 +153,19 @@ test('Air6 moves Theme below Board Log and defaults new installs to rainbow only
  assert.match(source,/if\(hasHeader\)homeCardsConfigured=true/);
 });
 
+test('LG6851F uses its own imported device image and normalizes the legacy model label',()=>{
+ const imageSource=fs.readFileSync(require('node:path').join(__dirname,'../app/src/main/assets/lg6851f_image.js'),'utf8');
+ const imageContext={window:{__DEV_IMG__:{}}};vm.createContext(imageContext);vm.runInContext(imageSource,imageContext);
+ assert.match(imageContext.window.__DEV_IMG__.lg6851f,/^data:image\/webp;base64,/);
+ const page=fs.readFileSync(require('node:path').join(__dirname,'../app/src/main/assets/fhcpeweb.html'),'utf8');
+ const adapter=fs.readFileSync(require('node:path').join(__dirname,'../app/src/main/assets/lan_ui.js'),'utf8');
+ const runtime=fs.readFileSync(require('node:path').join(__dirname,'../app/src/main/assets/lan_runtime.js'),'utf8');
+ assert.doesNotMatch(page,/LG6851M/);
+ assert.match(adapter,/LG6851M\$\/i\.test\(String\(data\.deviceModel\|\|''\)\)\)data=Object\.assign\(\{\},data,\{deviceModel:'LG6851F'\}\)/);
+ assert.match(runtime,/lg6851fImage=N\.assetRead\('lg6851f_image\.js'\)/);
+ assert.match(runtime,/images\+lg6851fImage/);
+});
+
 
 test('refreshing SMS settings retains changed fields but updates untouched values and the server baseline',()=>{
  const nodes={air6SmsCfg_email_subject:{value:'MY EDIT'},air6SmsCfg_email_enable:{checked:false},air6Result:{}},c=load(['air6ExtraData'],{active:true,accepts:()=>true,loaded:true,setBusy(){},currentPanelAction:'air6ExtraRead',smsConfigBaseline:{email_subject:'OLD',email_enable:false},smsConfigFields:[['email_subject','Subject','text'],['email_enable','Email','checkbox']],el:id=>nodes[id],syncSmsConfigFields(){}});

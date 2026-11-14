@@ -247,6 +247,7 @@
   // Cell-page refreshes carry a partial mode that must not overwrite it.
   let headerMode='';
   window.updateData=function(data){
+    if(data&&/^LG6851M$/i.test(String(data.deviceModel||'')))data=Object.assign({},data,{deviceModel:'LG6851F'});
     const air6=document.body?.dataset?.lanDevice==='air6';
     if(data?.deviceOnline){if(air6)renderRuntimeStatus(data);if(typeof data.mode==='string')headerMode=data.mode;}
     else if(data&&typeof data==='object'&&data.mode!==undefined&&headerMode)data=Object.assign({},data,{mode:headerMode});

@@ -83,7 +83,7 @@ final class AppViewController: UIViewController, WKScriptMessageHandler, WKNavig
     }
 
     private func loadAssets() {
-        let names = ["fhcpeweb.html", "device_address.js", "lan_ui.js", "air6_ui.js", "air6_automation.js", "sms_cards.js", "android_ui.css", "upstream_images.js", "changelog.json", "network_mode.js", "upstream_local.js", "air6_api.js", "lan_api.js", "lan_runtime.js"]
+        let names = ["fhcpeweb.html", "device_address.js", "lan_ui.js", "air6_ui.js", "air6_automation.js", "sms_cards.js", "android_ui.css", "upstream_images.js", "lg6851f_image.js", "changelog.json", "network_mode.js", "upstream_local.js", "air6_api.js", "lan_api.js", "lan_runtime.js"]
         for name in names {
             let base = URL(fileURLWithPath: Bundle.main.resourcePath ?? "")
             let candidates = [base.appendingPathComponent(name), base.appendingPathComponent("assets/\(name)")]

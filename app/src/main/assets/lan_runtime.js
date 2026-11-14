@@ -332,8 +332,8 @@
     }catch(e){if(version===sessionVersion)await networkFailure(e);}finally{tickBusy=false;if(resumePending&&foreground)Promise.resolve().then(tick).catch(networkFailure);}
   }
   async function boot(){
-    const page=N.assetRead('fhcpeweb.html'),adapter=N.assetRead('lan_ui.js'),images=N.assetRead('upstream_images.js'),css=N.assetRead('android_ui.css');
-    await __nloadHTML(page.replace('</head>','<style>'+css+'</style><script>'+images+'</'+'script></head>').replace('</body>','<script>'+N.assetRead('device_address.js')+'</'+'script><script>'+adapter+'</'+'script><script>'+N.assetRead('air6_automation.js')+'</'+'script><script>'+N.assetRead('air6_ui.js')+'</'+'script><script>'+N.assetRead('sms_cards.js')+'</'+'script></body>'));
+    const page=N.assetRead('fhcpeweb.html'),adapter=N.assetRead('lan_ui.js'),images=N.assetRead('upstream_images.js'),lg6851fImage=N.assetRead('lg6851f_image.js'),css=N.assetRead('android_ui.css');
+    await __nloadHTML(page.replace('</head>','<style>'+css+'</style><script>'+images+lg6851fImage+'</'+'script></head>').replace('</body>','<script>'+N.assetRead('device_address.js')+'</'+'script><script>'+adapter+'</'+'script><script>'+N.assetRead('air6_automation.js')+'</'+'script><script>'+N.assetRead('air6_ui.js')+'</'+'script><script>'+N.assetRead('sms_cards.js')+'</'+'script></body>'));
     await makeApi(selected()||{host:'192.168.8.1'},sessionVersion).initialize();
     const p=selected(),autoEligible=!!(p&&p.password&&!p.authBlocked);
     // Do not open a modal for a verified auto-login profile, even for a single
