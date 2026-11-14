@@ -1,4 +1,4 @@
-name: iOS IPA
+name: iOS IPA and Release
 
 on:
   workflow_dispatch:
@@ -13,6 +13,8 @@ on:
 jobs:
   build:
     runs-on: macos-15
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
@@ -30,3 +32,19 @@ jobs:
         with:
           name: FHCpeBoard-unsigned-IPA
           path: build/FHCpeBoard-unsigned.ipa
+      - name: Publish GitHub prerelease
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ios-v1.4.3-${{ github.run_number }}
+          name: Cmodem iOS 1.4.3 build ${{ github.run_number }}
+          prerelease: true
+          make_latest: false
+          body: |
+            macOS GitHub Actions build for the iOS port.
+
+            The attached IPA is unsigned. Sign it with an Apple development certificate and provisioning profile before installing it on an iPhone.
+          files: build/FHCpeBoard-unsigned.ipa
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

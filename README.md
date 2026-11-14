@@ -54,7 +54,7 @@ keyPassword=你的密钥密码
 
 ## iOS 云构建
 
-仓库包含 iOS 容器移植和 GitHub Actions 工作流。推送 iOS 源码后，或在 GitHub 的 Actions 页面手动运行 `iOS IPA`，macOS runner 会构建并上传 `FHCpeBoard-unsigned-IPA` 工件。当前工件未签名，安装到 iPhone 前需要使用 Apple 开发者证书签名；工作流本身不需要提交证书。
+仓库包含 iOS 容器移植和 GitHub Actions 工作流。推送 iOS 源码会触发 macOS 构建并上传 `FHCpeBoard-unsigned-IPA` 工件；在 Actions 页面手动运行 `iOS IPA and Release` 还会创建 GitHub 预发布版本并附上 IPA。IPA 未签名，安装到 iPhone 前需要 Apple 开发者证书和描述文件；工作流不需要提交证书。
 
 iOS 版本复用同一套页面和设备协议，通过 WKWebView、Keychain、URLSession 和 Photos Picker 提供平台能力。当前设备操作需要 iOS 允许本地网络访问；设备使用 HTTP 时由应用网络层访问。Xcode 构建和真机验证由 macOS runner / Apple 设备完成，本地 Windows 环境不能执行这些检查。
 
