@@ -312,7 +312,11 @@
   let lastActivitySent=0;const reportActivity=()=>{const now=Date.now();if(now-lastActivitySent<1000)return;lastActivitySent=now;send('lanActivity');};
   document.addEventListener('touchstart',reportActivity,{passive:true});document.addEventListener('click',reportActivity,{passive:true});
   // WebView file chooser uses Android's document picker (no iOS Photos API).
+  window.__iosImagePicked=encoded=>{
+    const img=new Image();img.onload=()=>{const scale=Math.min(1,1600/Math.max(img.width,img.height)),canvas=document.createElement('canvas');canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);send('setWallpaper',{data:canvas.toDataURL('image/jpeg',.72).split(',')[1]});};img.src='data:image/jpeg;base64,'+encoded;
+  };
   function pickWallpaper(){
+    if(typeof AndroidBoard.pickWallpaper==='function'){AndroidBoard.pickWallpaper();return;}
     const input=document.createElement('input');input.type='file';input.accept='image/*';input.onchange=()=>{
       const file=input.files?.[0];if(!file)return;
       const reader=new FileReader();reader.onload=()=>{

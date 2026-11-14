@@ -1,6 +1,42 @@
 <!doctype html><html><head><meta charset="utf-8"><title>FHCpeBoard LAN Core</title></head><body>
 <script>
 'use strict';
+// iOS supplies the same synchronous storage/asset surface as the Android bridge.
+if (!window.AndroidCore && window.webkit?.messageHandlers?.core) {
+  const native = window.webkit.messageHandlers.core;
+  const secure = window.__iosKeychain || (window.__iosKeychain = {});
+  const preferences = window.__iosPreferences || (window.__iosPreferences = {});
+  const values = new Proxy(preferences, {
+    get: (target, key) => typeof key === 'string' && Object.prototype.hasOwnProperty.call(secure, key) ? secure[key] : target[key],
+    set: (target, key, value) => { target[key] = String(value); return true; },
+    deleteProperty: (target, key) => { delete target[key]; return true; }
+  });
+  const assets = window.__iosAssets || {};
+  window.AndroidCore = {
+    kcGet: key => values[key] || '',
+    kcSet: (key, value) => { if(secureKey(key))secure[key]=String(value);else preferences[key]=String(value); native.postMessage({action:secureKey(key)?'keychainSet':'preferenceSet', key, value:String(value)}); },
+    kcRemove: key => { delete secure[key];delete preferences[key];native.postMessage({action:secureKey(key)?'keychainRemove':'preferenceRemove', key}); },
+    kcContains: key => Object.prototype.hasOwnProperty.call(values, key),
+    clearCaches: () => { for (const key of Object.keys(values)) if (/CACHE|CACHED_DATA/.test(key)) delete values[key]; native.postMessage({action:'clearCaches'}); return 0; },
+    assetRead: name => assets[name] || '',
+    fileDocsDir: () => 'Documents', fileExists: () => false, fileRead: () => '', fileWrite: () => {}, fileRemove: () => {},
+    stringify: value => value, parse: value => value, themeDark: () => matchMedia('(prefers-color-scheme: dark)').matches,
+    nativePing: () => JSON.stringify({ok:true,ver:'1.4.3-local-52',nativeCore:false}),
+    decodeSmsPdu: pdu => window.__iosPduDecoded?.[pdu] || '',
+    fetch: (id, url, options) => native.postMessage({action:'fetch', id, url, options}),
+    clearHttpSession: url => native.postMessage({action:'clearHttpSession', url}),
+    evalJS: (id, js) => native.postMessage({action:'evalJS', id, js}),
+    loadHTML: (id, html) => native.postMessage({action:'loadHTML', id, html}),
+    reseed: () => 'ok'
+  };
+  window.AndroidBoard = {
+    uiFlavor: () => 'default',
+    wifiCacheGet: scope => values['UPSTREAM_LOCAL_WIFI_CACHE_' + scope] || '',
+    wifiCacheSet: (scope, value) => { values['UPSTREAM_LOCAL_WIFI_CACHE_' + scope] = value; native.postMessage({action:'keychainSet',key:'UPSTREAM_LOCAL_WIFI_CACHE_'+scope,value}); },
+    postMessage: json => native.postMessage({action:'pageMessage', json})
+  };
+  function secureKey(key) { return key === 'LAN_PROFILES_V1' || key.startsWith('UPSTREAM_LOCAL_') || key.startsWith('LAN_DEVICE_NAME_OVERRIDE_'); }
+}
 let sequence = 0;
 const pending = new Map();
 function nativeCall(kind, invoke, timeout) {

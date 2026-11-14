@@ -1,8 +1,11 @@
+#if !defined(__APPLE__)
 #include <jni.h>
+#endif
 
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <cstring>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -278,6 +281,7 @@ std::string toJson(const DecodedSms& message) {
         "\",\"time\":\"" + jsonEscape(message.time) + "\"}";
 }
 
+#if !defined(__APPLE__)
 std::string fromJava(JNIEnv* environment, jstring value) {
     if (value == nullptr) return {};
     const char* chars = environment->GetStringUTFChars(value, nullptr);
@@ -334,3 +338,17 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_com_fhcpeboard_android_NativeCore_nativeDecodeSmsPdu(JNIEnv* environment, jobject, jstring pdu) {
     return toJava(environment, toJson(decodePdu(fromJava(environment, pdu))));
 }
+#else
+}  // namespace
+
+extern "C" int fhcpe_decode_sms_pdu(const char* input, char* output, size_t capacity) {
+    if (input == nullptr || output == nullptr || capacity == 0) return 0;
+    const std::string result = toJson(decodePdu(input));
+    if (result.empty() || result.size() + 1 > capacity) {
+        output[0] = '\0';
+        return 0;
+    }
+    std::memcpy(output, result.c_str(), result.size() + 1);
+    return static_cast<int>(result.size());
+}
+#endif

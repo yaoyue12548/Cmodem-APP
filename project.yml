@@ -1,0 +1,30 @@
+name: FHCpeBoard
+options:
+  bundleIdPrefix: com.fhcpeboard
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    PRODUCT_BUNDLE_IDENTIFIER: com.fhcpeboard.ios
+    PRODUCT_NAME: FHCpeBoard
+    SWIFT_VERSION: "5.0"
+    INFOPLIST_KEY_CFBundleDisplayName: Cmodem 管理
+    TARGETED_DEVICE_FAMILY: "1,2"
+    CODE_SIGN_STYLE: Automatic
+targets:
+  FHCpeBoard:
+    type: application
+    platform: iOS
+    sources:
+      - path: ios/FHCpeBoard
+      - path: app/src/main/cpp/native_core.cpp
+        compilerFlags: [-std=c++17]
+      - path: app/src/main/assets
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: ios/Info.plist
+        SWIFT_OBJC_BRIDGING_HEADER: ios/FHCpeBoard/FHCpeBoard-Bridging-Header.h
+        CLANG_CXX_LANGUAGE_STANDARD: c++17
