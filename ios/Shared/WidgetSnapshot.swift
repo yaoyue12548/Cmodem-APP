@@ -16,7 +16,7 @@ struct WidgetSnapshot: Codable {
         return try? JSONDecoder().decode(Self.self, from: data)
     }
     func write() -> Bool {
-        guard let file else { return false }
+        guard let file = Self.file else { return false }
         do {
             try JSONEncoder().encode(self).write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
             return true
