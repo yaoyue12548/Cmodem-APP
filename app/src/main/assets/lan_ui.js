@@ -113,7 +113,7 @@
       return upstreamTest.apply(this,args);
     };
   }
-  window._saveLocalAccountCore=()=>{
+  window._saveLocalAccountCore=(loginAfterSave=false)=>{
     if(busy)return false;
     try{
       const host=normalizedHost(el('localHost').value),user=el('localUser').value.trim(),pass=el('localPass').value||'';
@@ -128,12 +128,17 @@
       if(index<0){index=_localAccounts.length;_localAccounts.push(account);}else _localAccounts[index]=account;
       _localActiveIndex=index;profileDirty=true;_localSaveSilent=false;
       renderLocalAccounts();syncProfileAction();
-      send('saveLocalAccounts',{accounts:_localAccounts,activeIndex:index});return true;
+      const request={accounts:_localAccounts,activeIndex:index};
+      if(loginAfterSave===true)request.loginAfterSave=true;
+      send('saveLocalAccounts',request);return true;
     }catch(e){showUpdateToast(e.message,'warning');return false;}
   };
   window.saveLocalProfile=()=>{
     if(!_saveLocalAccountCore())return;
     saveOnlyPending=true;setBusy(true);
+  };
+  if(AndroidBoard.verifiedProfileSave)window.loginLocalAccount=()=>{
+    if(_saveLocalAccountCore(true))setBusy(true);
   };
   for(const id of ['localHost','localUser','localPass','localProfileName'])el(id).addEventListener('input',()=>{profileDirty=true;});
   const accountPicker=el('localAcctPicker');
@@ -145,9 +150,11 @@
     const saveButton=document.createElement('button');saveButton.id='localSaveProfileBtn';saveButton.type='button';saveButton.textContent='保存配置';saveButton.onclick=window.saveLocalProfile;
     actions.appendChild(saveButton);accountPicker.parentNode.appendChild(actions);
   }
+  let activeProfileId='';
   window.lineConfigResult=function(result){
     if(!result)return;
     _localAccounts=Array.isArray(result.accounts)?result.accounts:[];
+    activeProfileId=_localAccounts[result.activeIndex]?.id||'';
     for(const a of _localAccounts){const pending=pendingOptions.get(a.id);if(pending)Object.assign(a,pending);}
     if(!profileDirty)_localActiveIndex=_localAccounts.length?Math.max(0,Math.min(_localAccounts.length-1,result.activeIndex||0)):-1;
     renderLocalAccounts();syncProfileAction();
@@ -267,6 +274,16 @@
     if(busy)return;const a=_localAccounts[index];if(!a?.id){showUpdateToast('配置尚未保存，请在登录页保存后切换','warning');return;}
     profileDirty=false;closeDevSwitchModal();setBusy(true);send('lanSwitchProfile',{id:a.id});
   };
+  AndroidBoard.onDeviceSwipe?.(header, direction=>{
+    if(busy||profileEditorOpen)return;
+    const saved=_localAccounts.filter(account=>account.id);
+    const index=saved.findIndex(account=>account.id===activeProfileId);
+    if(saved.length<2||index<0)return;
+    const target=saved[(index+direction+saved.length)%saved.length];
+    setBusy(true);
+    showUpdateToast('正在切换到 '+(target.name||target.host)+' · '+target.user);
+    send('lanSwitchProfile',{id:target.id,fromOverview:true});
+  });
   // Keep requested Android lifecycle options separate from upstream's fields.
   const extra=document.createElement('details');extra.id='lanOptions';extra.innerHTML='<summary>自动连接选项</summary><label><input id="lanRefresh" type="checkbox" checked> 实时网速（1s）</label><label><input id="lanReconnect" type="checkbox" checked> 断线自动重登</label>';
   el('localTestMsg').parentNode.appendChild(extra);

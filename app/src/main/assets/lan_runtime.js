@@ -85,14 +85,14 @@
     catch(e){if(e.code!=='STALE')nextOtaStatus=Date.now()+60000;}
     finally{otaStatusBusy=false;}
   }
-  async function login(input,automatic){
+  async function login(input,automatic,fromOverview=false){
     if(!automatic&&loginBusy&&loginAutomatic)await new Promise(resolve=>loginWaiters.push(resolve));
     if(loginBusy||writing||automatic&&profileEditing)return;loginBusy=true;loginAutomatic=automatic;let started=false,authenticated=false,version=sessionVersion,p=null;
     try{
       if(!automatic)lastUserActivity=Date.now();
       p=profile(input);if(!p.password)throw Object.assign(Error('请输入设备管理密码'),{code:'VALIDATION'});
       const previous=api;version=++sessionVersion;started=true;online=false;lastSampleSig='';lastProbeShown=null;api=null;current=p;retryAt=0;retryBlocked=false;nextSmsBadge=0;smsBadgeBusy=false;nextOtaStatus=0;otaStatusBusy=false;
-      await state({automatic,busy:true,open:!automatic,message:automatic?'正在自动登录设备…':'正在登录设备…'});await status();
+      await state({automatic,busy:true,open:!automatic&&!fromOverview,message:automatic?'正在自动登录设备…':'正在登录设备…'});await status();
       await retiredQueue;await Promise.allSettled([previous?.queue,previous?.speedFlight]);
       stale(version);try{AndroidCore.clearHttpSession?.(p.host);}catch(_){}const candidate=makeApi(p,version);await candidate.login(p.username,p.password);stale(version);
       candidate.setReconnect(p.reconnect);api=candidate;online=true;p.verified=true;p.authBlocked=false;p.authSchema=AUTH_SCHEMA;
@@ -154,6 +154,8 @@
   async function saveAccounts(msg){
     const list=Array.isArray(msg.accounts)?msg.accounts:[];
     const next=list.map(profile),index=Math.max(0,Math.min(next.length-1,Number(msg.activeIndex)||0));
+    const nextId=next[index]?.id||'';
+    if(N.kcSetVerified)await N.kcSetVerified(STORE,JSON.stringify({profiles:next,activeId:nextId}));
     const replacement=current&&next.find(p=>p.id===current.id);
     const selectionChanged=next[index]?.id!==activeId;
     if(current&&(!replacement||!same(current,replacement)||next[index]?.id!==current.id)){
@@ -162,7 +164,7 @@
     }
     else if(replacement){current=replacement;api?.setReconnect(!profileEditing&&current.reconnect);if(!current.reconnect)retryAt=0;}
     if(selectionChanged&&!current){retryAt=0;retryBlocked=true;}
-    profiles=next;activeId=next[index]?.id||'';persist();
+    profiles=next;activeId=nextId;if(!N.kcSetVerified)persist();
     await ui('localAccountsSaved',{ok:true,count:profiles.length});await config();await status();
   }
   async function testConnection(msg){
@@ -180,11 +182,11 @@
   async function action(msg){
     switch(msg.action){
       case 'getLineConfig':return config();
-      case 'saveLocalAccounts':return saveAccounts(msg);
+      case 'saveLocalAccounts':await saveAccounts(msg);if(msg.loginAfterSave&&selected())await login(selected(),false);return;
       case 'reloginNow':if(!selected())throw Error('未配置登录信息');return login(selected(),false);
       case 'lanSwitchProfile':{
         const target=profiles.find(p=>p.id===msg.id);if(!target)throw Error('所选配置不存在，请重新打开配置列表');
-        return login(target,false);
+        return login(target,false,msg.fromOverview===true);
       }
       case 'testLocalConnection':return testConnection(msg);
       case 'lanOptions':return applyOptions(msg);
