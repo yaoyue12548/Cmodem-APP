@@ -130,7 +130,6 @@ body[data-lan-device="air6"] .air6-carrier-row {
   display:flex; flex-wrap:wrap; gap:8px; min-width:0; align-items:center;
 }
 body[data-lan-device="air6"] .air6-carrier-row .ca-kv { white-space:nowrap; }
-body[data-lan-device="air6"] .cell-card.air6-card { display:block; }
 #totalTraffic { font-size:clamp(22px,7vw,28px); line-height:1.2; white-space:nowrap; }
 body[data-lan-device="air6"] #caCard .ca-header { gap:10px; align-items:center; }
 body[data-lan-device="air6"] #caCard .ca-title { flex-shrink:0; }
@@ -235,7 +234,7 @@ html[data-theme=dark] #air6OtaNotes { border-color:rgba(111,152,255,.18); backgr
 .air6-ota-confirm>label { display:flex; align-items:center; gap:8px; font-size:14px; }
 .air6-ota-confirm input { width:18px; height:18px; }
 .air6-ota-warning { color:var(--ios-warning)!important; }
-.air6-add-cell { margin-top:10px; padding:7px 12px; border:0; border-radius:999px; color:var(--ios-primary); background:var(--ios-primary-soft); font-size:12px; }
+.air6-cell-add { flex:none; margin-left:auto; width:28px; height:28px; padding:0; border:0; border-radius:50%; color:var(--ios-primary); background:var(--ios-primary-soft); font-size:18px; }
 #air6CellDraftRows .air6-actions { align-items:center; }
 #air6CellDraftRows .air6-actions>span { flex:1; min-width:0; overflow-wrap:anywhere; font-size:12px; }
 #air6CellDraftRows .air6-actions>button { flex:none; }

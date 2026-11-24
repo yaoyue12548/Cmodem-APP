@@ -38,7 +38,7 @@ resources = {
 resources["assets"]["changelog.json"] = json.dumps(history, ensure_ascii=False)
 generated = "export default " + json.dumps(resources, ensure_ascii=True) + "\n"
 with ZipFile(output, "w", compression=ZIP_DEFLATED, compresslevel=9) as package:
-    for name in ["index.tsx", "present.tsx", "script.json"]:
+    for name in ["index.tsx", "present.tsx", "widget.tsx", "widget-data.ts", "script.json"]:
         package.write(source / name, name)
     package.writestr("resources.ts", generated)
 print(output.resolve())

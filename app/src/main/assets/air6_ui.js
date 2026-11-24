@@ -457,15 +457,38 @@
   const update=window.updateData,render=window.renderCells;
   window.renderCells=carriers=>{
     if(!active)return render(carriers);
-    const serving=el('servingCellsContainer'),neighbor=el('neighborListContainer');if(!serving||!neighbor)return;serving.textContent='';neighbor.textContent='';
-    for(const c of rawAllCellsData||[]){
-      const card=document.createElement('div');card.className='cell-card air6-card';const title=document.createElement('p');
-      const source={reported:'', 'same-frequency':'（同频）',arfcn:'（频点推算）',candidates:'（候选频段）',unknown:''}[c.bandSource]||'';
-      title.textContent=(c.isCarrier?'服务小区':'邻区')+' · '+({nr:'5G NR',lte:'4G LTE',umts:'3G',gsm:'2G'}[c.rat]||c.rat)+' · '+c.band+source;
-      const detail=document.createElement('p');detail.className='air6-hint';detail.textContent='PCI '+c.pci+' · ARFCN '+c.earfcn+'\nRSRP '+c.rsrp+' dBm · RSRQ '+c.rsrq+' dB · SINR '+c.sinr+' dB';card.appendChild(title);card.appendChild(detail);if(['nr','lte'].includes(c.rat)){const add=document.createElement('button');add.textContent='加入多小区列表';add.className='air6-add-cell';add.onclick=()=>addCellDraft(c);card.appendChild(add);}(c.isCarrier?serving:neighbor).appendChild(card);
-    }
-    if(!serving.children.length)serving.textContent='暂无服务小区数据';if(!neighbor.children.length)neighbor.textContent='暂无邻区数据';
-    if(el('neighborCount'))el('neighborCount').textContent='共 '+(rawAllCellsData||[]).filter(c=>!c.isCarrier).length+' 个邻区';
+    carriers=Array.isArray(carriers)?carriers:[];
+    const cells=[...(rawAllCellsData||[])];
+    // CA and cell measurements can arrive from different modem reports.
+    carriers.forEach((cc,index)=>{
+      if(cells.some(c=>c.isCarrier&&c.carrierIndex===index))return;
+      cells.push({...cc,earfcn:cc.arfcn,isCarrier:true,carrierIndex:index,bandSource:'reported'});
+    });
+    const bands={ 'same-frequency':'同频',arfcn:'频点推算',candidates:'候选频段' };
+    const rows=cells.map(c=>{
+      const cc=c.isCarrier?carriers[c.carrierIndex]:null;
+      const primary=cc?cc.type==='PCC':!!(c.isCarrier||c.isServing);
+      const bandwidth=cc?.dlBandwidth||cc?.bandwidth;
+      return {isCarrier:!!(c.isCarrier||c.isServing),carrierIndex:c.carrierIndex,primary,
+        cellTitle:cc?'主载波':'服务小区',displayBand:_esc(c.band||'--'),
+        cellDetails:[bandwidth,carriers.length?carriers.length+'CC':''].filter(v=>v&&v!=='--').map(v=>' | '+_esc(v)).join(''),
+        channelLabel:({nr:'ARFCN',lte:'EARFCN',umts:'UARFCN',gsm:'ARFCN'})[c.rat]||'ARFCN',
+        pci:_esc(c.pci),earfcn:_esc(c.earfcn),
+        ...Object.fromEntries(['rsrp','sinr','rsrq'].map(key=>[key,_esc(c[key]&&c[key]!=='--'?c[key]:cc?.[key]??c[key]??'--')]))};
+    });
+    render(carriers.map(cc=>({bandwidth:_esc(cc.dlBandwidth||cc.bandwidth||'--')})),rows);
+    const cards=[...el('servingCellsContainer').querySelectorAll('.cell-card')];
+    const neighbors=[...el('neighborListContainer').querySelectorAll('.cell-card')];
+    let si=0,ni=0;
+    cells.forEach((c,index)=>{
+      const card=rows[index].isCarrier?cards[si++]:neighbors[ni++];if(!card)return;
+      const meta=card.querySelector('.cell-sub-line');
+      if(meta&&bands[c.bandSource])meta.append(' | '+bands[c.bandSource]);
+      if(!['nr','lte'].includes(c.rat))return;
+      const add=document.createElement('button');add.type='button';add.className='air6-cell-add';
+      add.textContent='+';add.title='加入多小区列表';add.setAttribute('aria-label','加入多小区列表，PCI '+c.pci);
+      add.onclick=()=>addCellDraft(c);(card.querySelector('.cell-top')||card).appendChild(add);
+    });
   };
   let overviewSignal=null;
   function renderAir6Signal(){

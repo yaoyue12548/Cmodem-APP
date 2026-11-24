@@ -64,6 +64,15 @@ function clean(node){
 clean(tree);
 const output=html.serialize(tree).replace(/改完同时写入设备和云端/g,'仅修改 APP 显示名称').replace(/设备改名仅远程线路支持/g,'设备改名需要先登录局域网设备').replace(/设备已改名，云端同步失败/g,'设备已改名').replace(/看板服务远程重启/g,'本地连接刷新').replace(/远程服务正在恢复/g,'设备连接正在恢复').replace(/远程服务即将重启/g,'设备即将重启').replace(/远程服务/g,'设备连接').replace(/账号中心/g,'本地账号').replace(/账号未配置/g,'本地未配置');
 if(/activateWithCode|submitActivateCode|激活码/.test(output))throw Error('Cloud execution/content remains in page');
-fs.writeFileSync(path.resolve(__dirname,'../app/src/main/assets/fhcpeweb.html'),output);
-fs.writeFileSync(path.resolve(__dirname,'../docs/upstream-ui-manifest.json'),JSON.stringify({sourceSha256:crypto.createHash('sha256').update(source).digest('hex'),artifactSha256:crypto.createHash('sha256').update(output).digest('hex'),...counts},null,2)+'\n');
+const adapted=output.replace(/function renderCells\(e\) \{[\s\S]*?\n\}/,source=>source
+  .replace('renderCells(e)', 'renderCells(e, cells = rawAllCellsData)')
+  .replace('rawAllCellsData.forEach','cells.forEach')
+  .replace('const t = normalizeBand(', 'const t = e.displayBand ?? normalizeBand(')
+  .replace('const n = 0 === e.carrierIndex','const n = e.primary ?? (0 === e.carrierIndex)')
+  .replace('主载波</div><div class="cell-sub-line">PCI','${e.cellTitle || "主载波"}</div><div class="cell-sub-line">PCI')
+  .replaceAll(' | EARFCN ${e.earfcn',' | ${e.channelLabel || "EARFCN"} ${e.earfcn')
+  .replace(' | ${i} | ${s}','${e.cellDetails ?? (" | " + i + " | " + s)}')
+  .replaceAll('${safeVal(e.sinr, "dB")}','${e.sinr === "0" && e.displayBand !== undefined ? "0 dB" : safeVal(e.sinr, "dB")}'));
+fs.writeFileSync(path.resolve(__dirname,'../app/src/main/assets/fhcpeweb.html'),adapted);
+fs.writeFileSync(path.resolve(__dirname,'../docs/upstream-ui-manifest.json'),JSON.stringify({sourceSha256:crypto.createHash('sha256').update(source).digest('hex'),artifactSha256:crypto.createHash('sha256').update(adapted).digest('hex'),...counts},null,2)+'\n');
 console.log('Imported upstream page; removed cloud/activation and rename controls.');

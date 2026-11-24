@@ -1,4 +1,5 @@
-import { Script, fetch } from "scripting"
+import { Script, Widget, fetch } from "scripting"
+import { widgetKey, widgetOverview, type WidgetOverview } from "./widget-data"
 import resources from "./resources"
 import { presentBoard } from "./present"
 
@@ -53,10 +54,32 @@ async function run() {
   let visible = false
   let closeBoard = () => {}
   let preferenceWrite: Promise<unknown> = Promise.resolve()
+  let lastWidgetReload = 0
+  let widgetProfile = {id:"", name:""}
+  function reloadWidget() {
+    lastWidgetReload = Date.now()
+    void Promise.resolve(Widget.reloadAll()).catch(() => {})
+  }
+  function selectWidgetProfile(raw: string) {
+    let account
+    try {
+      const saved = JSON.parse(raw || "{}")
+      account = saved.profiles?.find((p: {id:string}) => p.id === saved.activeId)
+    } catch { return }
+    widgetProfile = {id:account?.id || "", name:account?.nameCustom ? account.name : ""}
+    const prior = Storage.get<WidgetOverview>(widgetKey)
+    if (!widgetProfile.id) {
+      if (prior) { Storage.remove(widgetKey); reloadWidget() }
+    } else if (prior?.id !== widgetProfile.id) {
+      Storage.set(widgetKey, widgetOverview(widgetProfile.id, widgetProfile.name, {}, 0))
+      reloadWidget()
+    }
+  }
   function write(key: string, value: string) {
     if (!Keychain.set(prefix + key, value) || ((key === profileKey || key.endsWith("_HOME_CARDS_") || key.endsWith("_SMS_TAB_")) && Keychain.get(prefix + key) !== value))
       throw Error("配置未保存，写入钥匙串失败。请重试。")
     values[key] = value
+    if (key === profileKey) selectWidgetProfile(value)
   }
   function remove(key: string) {
     if (Keychain.contains(prefix + key) && !Keychain.remove(prefix + key)) throw Error("无法移除设备配置")
@@ -67,6 +90,7 @@ async function run() {
       if (key.startsWith(prefix) && key !== prefix + profileKey) values[key.slice(prefix.length)] = Keychain.get(key) || ""
     }
     const saved = Keychain.get(prefix + profileKey)
+    selectWidgetProfile(saved || "")
     if (saved != null) values[profileKey] = saved
     const preferenceKeys = ["UPSTREAM_LOCAL_HOME_CARDS_"]
     if (saved) {
@@ -97,6 +121,14 @@ async function run() {
     })
     await core.addScriptMessageHandler("device", async (message: Message) => {
       switch (message.action) {
+        case "widgetSample": {
+          if (!widgetProfile.id || message.id !== widgetProfile.id) break
+          const now = Date.now()
+          const prior = Storage.get<WidgetOverview>(widgetKey)
+          if (Storage.set(widgetKey, widgetOverview(message.id, widgetProfile.name, message.sample, now))
+              && (!prior?.sampledAt || now-lastWidgetReload >= 15*60*1000)) reloadWidget()
+          break
+        }
         case "fetch": return requestDevice(message)
         case "clearSession": sessions.delete(message.origin); break
         case "set": write(message.key, message.value); break

@@ -1,6 +1,6 @@
 {
   "sourceSha256": "5b9ba73df8474cf31eb517d8debf03a29406b5e7a4cf8fd9a5b9935f202f0922",
-  "artifactSha256": "fd230846c11c1fbac5274316bb2be710563bc2752ee4597d5aa36987dca99bae",
+  "artifactSha256": "430fd4fcf06313fcc02c53720811bca182e1fd893f0a5fda4c94efb3d6aea282",
   "removedFunctions": [
     "_refreshDeviceRowIfVisible",
     "renderRemoteSwitchList",

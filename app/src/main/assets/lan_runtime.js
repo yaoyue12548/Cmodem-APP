@@ -141,8 +141,13 @@
   async function refresh(force,global=false){
     if(!api||!online)return;if(force){lastSampleSig='';lastProbeShown=null;}
     const started=Date.now(),version=sessionVersion;let published=false;
+    let widgetPublished=false;
     const publish=async data=>{
-      stale(version);published=true;if(lastLiveAt>started)data=Object.assign({},data,{downSpeed:undefined,upSpeed:undefined});const sig=sampleSig(data);
+      stale(version);
+      if(!widgetPublished&&data&&current&&N.widgetSample){
+        widgetPublished=true;N.widgetSample(current.id,data);
+      }
+      published=true;if(lastLiveAt>started)data=Object.assign({},data,{downSpeed:undefined,upSpeed:undefined});const sig=sampleSig(data);
       if(!sig||sig!==lastSampleSig){lastSampleSig=sig;await ui('updateData',data);}
       else if(data&&(data.downSpeed!=null||data.upSpeed!=null))await ui('updateSpeed',{down:data.downSpeed,up:data.upSpeed});
       if(lastProbeShown!==true){lastProbeShown=true;await ui('probeResult',true);}
