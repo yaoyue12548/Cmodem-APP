@@ -52,8 +52,9 @@ async function run() {
   const values: Record<string, string> = Object.create(null)
   let visible = false
   let closeBoard = () => {}
+  let preferenceWrite: Promise<unknown> = Promise.resolve()
   function write(key: string, value: string) {
-    if (!Keychain.set(prefix + key, value) || (key === profileKey && Keychain.get(prefix + key) !== value))
+    if (!Keychain.set(prefix + key, value) || ((key === profileKey || key.endsWith("_HOME_CARDS_") || key.endsWith("_SMS_TAB_")) && Keychain.get(prefix + key) !== value))
       throw Error("配置未保存，写入钥匙串失败。请重试。")
     values[key] = value
   }
@@ -67,14 +68,31 @@ async function run() {
     }
     const saved = Keychain.get(prefix + profileKey)
     if (saved != null) values[profileKey] = saved
+    const preferenceKeys = ["UPSTREAM_LOCAL_HOME_CARDS_"]
+    if (saved) {
+      let profiles
+      try { profiles = JSON.parse(saved).profiles } catch { profiles = [] }
+      for (const p of Array.isArray(profiles) ? profiles : [])
+        preferenceKeys.push("UPSTREAM_LOCAL_DEVICE_" + encodeURIComponent(p.host+"|"+(p.username||p.user||"")) + "_UPSTREAM_LOCAL_SMS_TAB_")
+    }
+    for (const key of preferenceKeys) {
+      const value = Keychain.get(prefix + key)
+      if (value != null) values[key] = value
+    }
     for (const controller of [core, board])
       controller.shouldAllowRequest = async request => request.url === base || request.url === "about:blank"
     await core.setSettings({inactiveSchedulingPolicy: "none"})
     await board.addScriptMessageHandler("board", async (message: Message) => {
-      if (message.action === "close") closeBoard()
+      if (message.action === "close") { await preferenceWrite; closeBoard() }
       if (message.action === "wifi") write(wifiPrefix + message.scope, message.value)
-      if (message.action === "page")
-        await core.evaluateJavaScript("void window.__onPageMessage(" + js(message.json) + ")")
+      if (message.action === "page") {
+        const action = JSON.parse(message.json).action
+        if (action === "setHomeCards" || action === "smsTab") {
+          const write = preferenceWrite.then(() => core.evaluateJavaScript("return window.__saveBoardPreference(" + js(message.json) + ")"))
+          preferenceWrite = write.catch(() => {})
+          try { await write } catch { await Dialog.alert({title:"Cmodem", message:"设置未保存，请重试。"}) }
+        } else await core.evaluateJavaScript("void window.__onPageMessage(" + js(message.json) + ")")
+      }
       return null
     })
     await core.addScriptMessageHandler("device", async (message: Message) => {
@@ -95,7 +113,8 @@ async function run() {
         case "load": {
           const wifi = Object.fromEntries(Object.entries(values).filter(([k]) => k.startsWith(wifiPrefix))
             .map(([k,v]) => [k.slice(wifiPrefix.length), v]))
-          const bridge = "<script>window.__cmodemWifi=" + js(wifi) + ";\n" + resources.boardBridge + "</script>"
+          const bridge = "<script>window.__cmodemVersion=" + js(resources.version) +
+            ";window.__cmodemWifi=" + js(wifi) + ";\n" + resources.boardBridge + "</script>"
           const html = message.html.replace(/<head\b[^>]*>/i, (head: string) => head + policy + bridge)
           if (!await board.loadHTML(html, base)) throw Error("无法加载管理界面")
           visible = true

@@ -18,6 +18,22 @@
   const persist=()=>N.kcSet(STORE,JSON.stringify({profiles,activeId}));
   const scopedKey=(p,key)=>'UPSTREAM_LOCAL_DEVICE_'+encodeURIComponent(p.host+'|'+(p.username||p.user||''))+'_'+key;
   const smsCacheKey=p=>p?scopedKey(p,'SMS_CACHE_V1'):'';
+  const smsTabKey=p=>scopedKey(p,'UPSTREAM_LOCAL_SMS_TAB_');
+  if(N.kcSetVerified)window.__saveBoardPreference=async raw=>{
+    const msg=JSON.parse(raw);
+    if(msg.action==='setHomeCards'&&msg.key==='header'){
+      const key='UPSTREAM_LOCAL_HOME_CARDS_',conf=JSON.parse(N.kcGet(key)||'{}');
+      conf.header=msg.value==='pro'?'pro':'basic';
+      await N.kcSetVerified(key,JSON.stringify(conf));
+      await ui('homeCardsResult',{conf,ok:1,saved:1});
+    }else if(msg.action==='smsTab'){
+      const p=current||selected();if(!p)throw Error('请先选择设备');
+      const enable=msg.enable==='1'?'1':'0';
+      await N.kcSetVerified(smsTabKey(p),enable);
+      if((current||selected())?.id===p.id)await ui('lanRestoreSmsTab',enable);
+    }
+    return true;
+  };
   function clearAuthCache(p){
     let host;try{host=LanProtocol.address(p.host);}catch(_){host=String(p.host||'');}
     for(const name of ['FH_LOGIN_AT','PWEB_LOGIN_AT','FH_LINE','FH_PROBE_AT','FH_SEED'])N.kcRemove(scopedKey(p,'UPSTREAM_LOCAL_'+name+'_'+host));
@@ -104,6 +120,7 @@
       if(!automatic||lastConnectedScope!==connectedScope)await ui('lanDeviceType',candidate.line?.mode==='air6'?'air6':'fh');
       lastConnectedScope=connectedScope;
       await state({automatic,syncProfiles:true,busy:false,success:true,message:'登录成功 · '+candidate.line.label});await config();await status();
+      if(N.kcSetVerified&&candidate.line?.mode!=='air6')await ui('lanRestoreSmsTab',N.kcGet(smsTabKey(p))||'0');
       await ui('setSuperMode',candidate.line?.mode!=='air6'&&/^superadmin$/i.test(p.username)?'1':'0');
       if(candidate.line?.mode==='air6'){await probeSmsBadge(true);await probeOtaStatus(true);}
       await refresh();
@@ -271,6 +288,7 @@
   window.__onPageMessage=raw=>{
     let msg;try{msg=JSON.parse(raw);}catch(_){return Promise.resolve();}
     if(!msg?.action)return Promise.resolve();
+    if(msg.action==='getChangelog')return action(msg);
     if(msg.action==='lanProfileEditing'){
       profileEditing=!!msg.open;retryAt=0;
       if(profileEditing&&loginBusy&&loginAutomatic){sessionVersion++;api=null;online=false;retryBlocked=true;}
@@ -338,6 +356,7 @@
     await __nloadHTML(page.replace('</head>','<style>'+css+'</style><script>'+images+lg6851fImage+'</'+'script></head>').replace('</body>','<script>'+N.assetRead('device_address.js')+'</'+'script><script>'+adapter+'</'+'script><script>'+N.assetRead('air6_automation.js')+'</'+'script><script>'+N.assetRead('air6_ui.js')+'</'+'script><script>'+N.assetRead('sms_cards.js')+'</'+'script></body>'));
     await makeApi(selected()||{host:'192.168.8.1'},sessionVersion).initialize();
     const p=selected(),autoEligible=!!(p&&p.password&&!p.authBlocked);
+    if(N.kcSetVerified&&p&&p.fhLine!=='air6')await ui('lanRestoreSmsTab',N.kcGet(smsTabKey(p))||'0');
     // Do not open a modal for a verified auto-login profile, even for a single
     // frame. Authentication failures still explicitly open the login dialog.
     await state({syncProfiles:true,open:!autoEligible});await config();await status();await restoreWallpaper();

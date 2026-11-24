@@ -47,6 +47,19 @@ window.AndroidBoard = {
   postMessage: message => sendToHost({action: 'page', json: typeof message === 'string' ? message : JSON.stringify(message)}),
 };
 window.addEventListener('DOMContentLoaded', () => {
+  window.setAppVersions = () => {
+    window._baseVersionText = 'cmodem v' + window.__cmodemVersion;
+    window._setVersionsText(window._baseVersionText);
+  };
+  window.setAppVersions();
+  for (const footer of document.querySelectorAll('.version-line[onclick="openChangelog()"]')) {
+    footer.setAttribute('role','button');
+    footer.tabIndex = 0;
+    footer.setAttribute('aria-label',window._baseVersionText+'，查看更新记录');
+    footer.onkeydown = event => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); footer.click(); }
+    };
+  }
   const tabs = document.querySelector('.tabbar');
   if (!tabs) return;
   const dock = document.createElement('div');

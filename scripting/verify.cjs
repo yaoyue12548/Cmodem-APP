@@ -24,12 +24,22 @@ function simulator() {
       run().catch(e => errors.push(String(e))).finally(() => Script.exit())
       return
     }
+    if (!errors.length && launched >= 2 && launched < 5) {
+      if (launched === 2) {
+        const saved=JSON.parse(keys.get(profileKey))
+        const p=saved.profiles.find(p=>p.id===saved.activeId)
+        p.fhLine='pro2'; p.authBlocked=true
+        keys.set(profileKey,JSON.stringify(saved))
+      }
+      run().catch(e=>errors.push(String(e))).finally(()=>Script.exit())
+      return
+    }
     document.body.textContent = errors.length ? 'FAIL '+errors.join(' | ') : 'PASS '+results.join(' | ')
   }}
   window.Dialog = {alert: async value => errors.push(value.message)}
   const keys = new Map()
   const profileKey = 'cmodem.LAN_PROFILES_V1'
-  window.Keychain = {keys: () => [...keys.keys()].filter(k => k !== profileKey), get: k => keys.get(k),
+  window.Keychain = {keys: () => [...keys.keys()].filter(k => k !== profileKey && !/_HOME_CARDS_|_SMS_TAB_/.test(k)), get: k => keys.get(k),
     set: (k,v) => !(failWrite && k === profileKey) && !!keys.set(k,v), contains: k => keys.has(k), remove: k => keys.delete(k)}
   const requests = []
   const signIns = []
@@ -74,6 +84,25 @@ function simulator() {
       const core = views.at(-2).frame.contentWindow, board = this.frame.contentWindow
       const el = id => board.document.getElementById(id)
       const until = async predicate => { for(let i=0;i<250 && !predicate();i++) await delay(10); return predicate() }
+      if (launched>=3) {
+        assert(await until(()=>el('localLoginModal').classList.contains('active')), 'saved FiberHome profile ready')
+        board.lanDeviceType('fh')
+        if(launched>=4){
+          const enabled=launched===4
+          assert(el('cardStyleVal').textContent===(enabled?'彩光':'素白'), 'FiberHome theme restored '+enabled)
+          assert(el('smsTabSwitch').checked===enabled && (el('smsTabBtn').style.display!=='none')===enabled, 'SMS switch and tab restored '+enabled)
+        }
+        if(launched<5){
+          const enabled=launched===3
+          board.pickCardStyle(enabled?'pro':'basic')
+          el('smsTabSwitch').checked=enabled
+          board.toggleSmsTab(el('smsTabSwitch'))
+          const before=dismissals
+          el('cmodemClose').click()
+          assert(await until(()=>dismissals===before+1), 'immediate exit waits for preferences')
+        }
+        return
+      }
       function drag(dx, dy) {
         const target = el('hcDeviceImg')
         for (const type of ['touchstart','touchmove','touchend']) {
@@ -121,6 +150,11 @@ function simulator() {
       await core.__nfetch(base+'/cgi-bin/luci/')
       assert(!requests.at(-1).headers.Cookie, 'new session clears cookies')
       assert(typeof board.lanGlobalRefresh === 'function' && typeof core.LanProtocol.LanApi === 'function', 'runtime ready')
+      board.setAppVersions({html:'v1.4.3'})
+      assert(el('versionLine').textContent==='cmodem v'+resources.version, 'overview footer uses installed version')
+      el('versionLine').click()
+      assert(await until(()=>el('changelogModal').classList.contains('active') && el('changelogBody').textContent.includes(resources.version) && el('changelogBody').textContent.includes('主题配色')), 'offline footer opens current and historical notes')
+      board.closeChangelogModal()
       const close = el('cmodemClose')
       assert(close?.parentElement === el('boardBottomBar') && close.getAttribute('aria-label') === '关闭脚本', 'exit beside bottom tabs')
       const tabBounds = board.document.querySelector('.tabbar').getBoundingClientRect()
@@ -148,7 +182,7 @@ function simulator() {
       await delay(20)
       assert(signIns.length===1, 'one profile swipe stays on current account')
       close.click()
-      assert(dismissals===1, 'single tap calls fullscreen dismissal')
+      assert(await until(()=>dismissals===1), 'single tap calls fullscreen dismissal')
     }
   }
 }

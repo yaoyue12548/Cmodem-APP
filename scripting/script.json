@@ -2,7 +2,7 @@
   "name": "Cmodem",
   "localizedNames": { "zh-Hans": "Cmodem 设备管理" },
   "description": "Air6 与烽火 CPE 局域网管理",
-  "version": "1.4.3-5",
+  "version": "1.4.3-7",
   "entry": "index.tsx",
   "icon": "antenna.radiowaves.left.and.right",
   "color": "rgba(0, 140, 200, 1.0)",

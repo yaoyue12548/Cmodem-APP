@@ -21,6 +21,10 @@
     window.addEventListener('resize',scheduleHeaderFit);scheduleHeaderFit();
   }
   const send=(action,data)=>AndroidBoard.postMessage(JSON.stringify(Object.assign({action},data)));
+  window.lanRestoreSmsTab=enable=>{
+    const toggle=el('smsTabSwitch');if(toggle)toggle.checked=enable==='1';
+    window.smsUpdate({type:'tab',enable});
+  };
   // The upstream Wi-Fi cache includes plaintext PSKs. Android stores it in
   // the encrypted Keystore-backed profile store, not WebView localStorage.
   if(typeof AndroidBoard!=='undefined'&&typeof AndroidBoard.wifiCacheGet==='function'){
