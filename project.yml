@@ -18,6 +18,13 @@ targets:
     platform: iOS
     sources:
       - path: ios/FHCpeBoard
+        excludes:
+          - "*.js"
+      - path: ios/FHCpeBoard/native-board.js
+        buildPhase: resources
+      - path: ios/FHCpeBoard/native-sample.js
+        buildPhase: resources
+      - path: ios/Shared
       - path: app/src/main/cpp/native_core.cpp
         compilerFlags: [-std=c++17]
       - path: app/src/main/assets
@@ -25,7 +32,25 @@ targets:
         buildPhase: resources
     settings:
       base:
+        CODE_SIGN_ENTITLEMENTS: ios/Cmodem.entitlements
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: ios/Info.plist
         SWIFT_OBJC_BRIDGING_HEADER: ios/FHCpeBoard/FHCpeBoard-Bridging-Header.h
         CLANG_CXX_LANGUAGE_STANDARD: c++17
+    dependencies:
+      - target: CmodemWidget
+        embed: true
+  CmodemWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ios/Widget
+      - path: ios/Shared
+    settings:
+      base:
+        PRODUCT_NAME: CmodemWidget
+        PRODUCT_BUNDLE_IDENTIFIER: com.fhcpeboard.ios.widget
+        INFOPLIST_FILE: ios/WidgetInfo.plist
+        CODE_SIGN_ENTITLEMENTS: ios/Cmodem.entitlements
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES

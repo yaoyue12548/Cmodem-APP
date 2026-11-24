@@ -2,6 +2,7 @@ import UIKit
 import WebKit
 import PhotosUI
 import Security
+import WidgetKit
 import Darwin
 
 final class AppViewController: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate, PHPickerViewControllerDelegate, URLSessionTaskDelegate {
@@ -11,6 +12,9 @@ final class AppViewController: UIViewController, WKScriptMessageHandler, WKNavig
     private var preferences: [String: String] = [:]
     private var assets: [String: String] = [:]
     private var coreHTML = ""
+    private var pendingBoardLoad: String?
+    private var widgetProfile = (id: "", name: "")
+    private var lastWidgetReload = Date.distantPast
     private var board: WKWebView!
     private var core: WKWebView!
     private lazy var session: URLSession = {
@@ -27,6 +31,7 @@ final class AppViewController: UIViewController, WKScriptMessageHandler, WKNavig
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
         loadKeychain()
+        selectWidgetProfile(keychain["LAN_PROFILES_V1"] ?? "{}")
         loadAssets()
         let controller = WKUserContentController()
         controller.add(self, name: "core")
@@ -49,7 +54,10 @@ final class AppViewController: UIViewController, WKScriptMessageHandler, WKNavig
         let boardController = WKUserContentController()
         boardController.add(self, name: "core")
         let boardBootstrap = "window.__iosKeychain=\(json(keychain));window.AndroidBoard={uiFlavor:()=> 'default',wifiCacheGet:s=>window.__iosKeychain['UPSTREAM_LOCAL_WIFI_CACHE_'+s]||'',wifiCacheSet:(s,v)=>{window.__iosKeychain['UPSTREAM_LOCAL_WIFI_CACHE_'+s]=v;window.webkit.messageHandlers.core.postMessage({action:'keychainSet',key:'UPSTREAM_LOCAL_WIFI_CACHE_'+s,value:v})},pickWallpaper:()=>window.webkit.messageHandlers.core.postMessage({action:'pickWallpaper'}),postMessage:j=>window.webkit.messageHandlers.core.postMessage({action:'pageMessage',json:typeof j==='string'?j:JSON.stringify(j)})};"
-        boardController.addUserScript(WKUserScript(source: boardBootstrap, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+        let boardAdapter = nativeResource("native-board", "js")
+        boardController.addUserScript(WKUserScript(source: boardBootstrap + "window.__cmodemVersion=\(json("\(version) (\(build))"));\n" + boardAdapter, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         let boardConfig = WKWebViewConfiguration()
         boardConfig.userContentController = boardController
         board = WKWebView(frame: .zero, configuration: boardConfig)
@@ -90,6 +98,20 @@ final class AppViewController: UIViewController, WKScriptMessageHandler, WKNavig
             if let url = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path) }),
                let value = try? String(contentsOf: url, encoding: .utf8) { assets[name] = value }
         }
+        if let previous = assets["changelog.json"],
+           var history = (try? JSONSerialization.jsonObject(with: Data(previous.utf8))) as? [String: Any],
+           var logs = history["logs"] as? [[String: Any]] {
+            logs.insert(["ver": "Cmodem iOS 1.4.3 (140353)", "date": "2026-11-25",
+                         "items": ["支持小、中、大三种桌面小组件，展示当前设备最近采集的信号、频段与流量。",
+                                   "概览顶部卡片左右滑动可切换账号或设备。Air6 小区页采用烽火的彩色指标卡。","改进账号、主题配色和短信开关保存，点按页脚可查看本地更新记录。"]], at: 0)
+            history["logs"] = logs
+            assets["changelog.json"] = json(history)
+        }
+    }
+
+    private func nativeResource(_ name: String, _ ext: String) -> String {
+        guard let url = Bundle.main.url(forResource: name, withExtension: ext) else { return "" }
+        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
     }
 
     private func loadCore() {
@@ -101,6 +123,7 @@ final class AppViewController: UIViewController, WKScriptMessageHandler, WKNavig
             return
         }
         coreHTML = source
+        coreHTML = coreHTML.replacingOccurrences(of: "<script src=\"network_mode.js\">", with: "<script>\(nativeResource("native-sample", "js"))</script><script src=\"network_mode.js\">")
         for name in ["network_mode.js", "device_address.js", "upstream_local.js", "air6_api.js", "lan_api.js", "lan_runtime.js"] {
             coreHTML = coreHTML.replacingOccurrences(of: "<script src=\"\(name)\"></script>", with: "<script>\(assets[name] ?? "")</script>")
         }
@@ -121,6 +144,13 @@ final class AppViewController: UIViewController, WKScriptMessageHandler, WKNavig
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any], let action = body["action"] as? String else { return }
         switch action {
+        case "widgetSample":
+            if message.webView === core, let id = body["id"] as? String, let sample = body["sample"] as? [String: Any] {
+                updateWidget(id, sample)
+            }
+        case "verifiedSet":
+            guard message.webView === core, let id = body["id"] as? String, let key = body["key"] as? String, let value = body["value"] as? String else { return }
+            complete(id, result: keychainSet(value, account: key) ? "ok" : "failed")
         case "keychainSet":
             if let key = body["key"] as? String, let value = body["value"] as? String { keychainSet(value, account: key) }
         case "keychainRemove":
@@ -156,8 +186,8 @@ final class AppViewController: UIViewController, WKScriptMessageHandler, WKNavig
             }
         case "loadHTML":
             guard let id = body["id"] as? String, let html = body["html"] as? String else { return }
+            pendingBoardLoad = id
             board.loadHTMLString(html, baseURL: URL(string: "https://fhcpeboard.local/"))
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in self?.complete(id, result: "true") }
         case "pageMessage":
             if let raw = body["json"] as? String { forwardMessage(raw) }
         case "pickWallpaper":
@@ -313,6 +343,13 @@ final class AppViewController: UIViewController, WKScriptMessageHandler, WKNavig
         DispatchQueue.main.async { [weak self] in self?.core.evaluateJavaScript("window.__onPageMessage(\(literal))") }
     }
 
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if webView === board, let id = pendingBoardLoad {
+            pendingBoardLoad = nil
+            complete(id, result: "true")
+        }
+    }
+
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
@@ -346,12 +383,43 @@ final class AppViewController: UIViewController, WKScriptMessageHandler, WKNavig
         }
     }
 
-    private func keychainSet(_ value: String, account: String) {
-        keychain[account] = value
+    @discardableResult private func keychainSet(_ value: String, account: String) -> Bool {
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: keychainService, kSecAttrAccount as String: account]
         let data = Data(value.utf8)
-        if SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess { SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary) }
-        else { SecItemAdd((query.merging([kSecValueData as String: data, kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]) { _, new in new }) as CFDictionary, nil) }
+        var status = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        if status == errSecItemNotFound {
+            status = SecItemAdd(query.merging([kSecValueData as String: data, kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]) { _, new in new } as CFDictionary, nil)
+        }
+        guard status == errSecSuccess else { return false }
+        keychain[account] = value
+        if account == "LAN_PROFILES_V1" { selectWidgetProfile(value) }
+        return true
+    }
+
+    private func selectWidgetProfile(_ raw: String) {
+        guard let saved = (try? JSONSerialization.jsonObject(with: Data(raw.utf8))) as? [String: Any] else { return }
+        let active = saved["activeId"] as? String ?? ""
+        let account = (saved["profiles"] as? [[String: Any]])?.first { ($0["id"] as? String) == active }
+        let id = account?["id"] as? String ?? ""
+        let name = account?["nameCustom"] as? Bool == true ? account?["name"] as? String ?? "" : ""
+        widgetProfile = (id, name)
+        if WidgetSnapshot.read()?.id != id, WidgetSnapshot(id: id, name: name).write() {
+            lastWidgetReload = .distantPast
+            WidgetCenter.shared.reloadTimelines(ofKind: WidgetSnapshot.kind)
+        }
+    }
+
+    private func updateWidget(_ id: String, _ sample: [String: Any]) {
+        guard !id.isEmpty, id == widgetProfile.id else { return }
+        var snapshot = WidgetSnapshot(id: id, name: widgetProfile.name, sampledAt: Date())
+        for key in ["deviceModel","operator","mode","rsrp","sinr","rsrq","rssi","bandTag","onlineNum","modemTemp","uptimeText","pci","pccArfcn","bandwidth","carrierCount","primaryBand","todayRxToday","todayTxToday","monthRxToday","monthTxToday"] {
+            if let value = sample[key] as? String { snapshot.fields[key] = String(value.prefix(80)) }
+            else if let value = sample[key] as? NSNumber { snapshot.fields[key] = value.stringValue }
+        }
+        if snapshot.write(), Date().timeIntervalSince(lastWidgetReload) >= 900 {
+            lastWidgetReload = Date()
+            WidgetCenter.shared.reloadTimelines(ofKind: WidgetSnapshot.kind)
+        }
     }
 
     private func keychainRemove(account: String) {

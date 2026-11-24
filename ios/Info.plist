@@ -15,7 +15,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>1.4.3</string>
 	<key>CFBundleVersion</key>
-	<string>140352</string>
+	<string>140353</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>用于连接并管理你配置的局域网 CPE 设备。</string>
 	<key>NSAppTransportSecurity</key>

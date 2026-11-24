@@ -14,6 +14,11 @@ if (!window.AndroidCore && window.webkit?.messageHandlers?.core) {
   const assets = window.__iosAssets || {};
   window.AndroidCore = {
     kcGet: key => values[key] || '',
+    async kcSetVerified(key, value) {
+      const result = await nativeCall('k', id => native.postMessage({action:'verifiedSet',id,key,value:String(value)}));
+      if(result!=='ok')throw Error('设置未保存，请重试');
+      secure[key]=String(value);
+    },
     kcSet: (key, value) => { if(secureKey(key))secure[key]=String(value);else preferences[key]=String(value); native.postMessage({action:secureKey(key)?'keychainSet':'preferenceSet', key, value:String(value)}); },
     kcRemove: key => { delete secure[key];delete preferences[key];native.postMessage({action:secureKey(key)?'keychainRemove':'preferenceRemove', key}); },
     kcContains: key => Object.prototype.hasOwnProperty.call(values, key),

@@ -202,6 +202,7 @@
   }
   async function restoreWallpaper(){const data=N.kcGet('LAN_WALLPAPER');if(data)await __nevalJS('window.wallpaperChunk&&window.wallpaperChunk(0,1,'+JSON.stringify(data)+')');return !!data;}
   async function action(msg){
+    if(N.kcSetVerified&&['setHomeCards','smsTab'].includes(msg.action))return window.__saveBoardPreference(JSON.stringify(msg));
     switch(msg.action){
       case 'getLineConfig':return config();
       case 'saveLocalAccounts':await saveAccounts(msg);if(msg.loginAfterSave&&selected())await login(selected(),false);return;

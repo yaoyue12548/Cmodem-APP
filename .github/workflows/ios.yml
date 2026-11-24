@@ -27,6 +27,15 @@ jobs:
         run: |
           mkdir -p build/Payload
           cp -R build/DerivedData/Build/Products/Release-iphoneos/FHCpeBoard.app build/Payload/
+          app=build/Payload/FHCpeBoard.app
+          widget="$app/PlugIns/CmodemWidget.appex"
+          test -x "$widget/CmodemWidget"
+          test -s "$app/native-board.js" && test -s "$app/native-sample.js"
+          test -s "$app/assets/air6_ui.js"
+          test "$(plutil -extract NSExtension.NSExtensionPointIdentifier raw "$widget/Info.plist")" = "com.apple.widgetkit-extension"
+          for key in CFBundleVersion CFBundleShortVersionString; do
+            test "$(plutil -extract "$key" raw "$app/Info.plist")" = "$(plutil -extract "$key" raw "$widget/Info.plist")"
+          done
           cd build && zip -r FHCpeBoard-unsigned.ipa Payload
       - uses: actions/upload-artifact@v4
         with:
@@ -43,7 +52,7 @@ jobs:
           body: |
             macOS GitHub Actions build for the iOS port.
 
-            The attached IPA is unsigned. Sign it with an Apple development certificate and provisioning profile before installing it on an iPhone.
+            The IPA is unsigned. Sign the embedded CmodemWidget extension and the containing app with profiles for their respective bundle IDs. Enable group.com.fhcpeboard.ios for both targets so the widget can read dashboard samples.
           files: build/FHCpeBoard-unsigned.ipa
           fail_on_unmatched_files: true
         env:
